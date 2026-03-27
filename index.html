@@ -1233,18 +1233,19 @@ function go(headers,rows){
   requestAnimationFrame(applyF);
 }
 
-async function load(){
+async function load(silent){
+  if(!silent)stat("Обновление...");
   try{
-    stat("Загрузка...");
-    const url=`https://docs.google.com/spreadsheets/d/${SID}/gviz/tq?gid=${SGID}&tqx=out:json`;
+    const url=`https://docs.google.com/spreadsheets/d/${SID}/gviz/tq?gid=${SGID}&tqx=out:json&_=${Date.now()}`;
     const res=await fetch(url);if(!res.ok)throw new Error(res.status);
     const j=parseGviz(await res.text());
     const cols=j.table.cols.map(c=>c.label||c.id||"");
     const rows=j.table.rows.map(r=>r.c.map(cv));
     const d=normalize(cols,rows);
     go(d.headers,d.rows);
-    stat("Загружено: "+d.rows.length+" строк","ok");
-  }catch(e){console.error(e);stat("Нет доступа. Загрузите CSV.","err")}
+    const ts=new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+    stat("Обновлено: "+d.rows.length+" строк ("+ts+")","ok");
+  }catch(e){console.error(e);if(!silent)stat("Ошибка. Загрузите CSV.","err")}
 }
 
 /* ===== Источники данных ===== */
@@ -1309,10 +1310,10 @@ function loadFromAppsScript(silent){
 let _autoTimer=null;
 function startAutoRefresh(min){
   if(_autoTimer){clearInterval(_autoTimer);_autoTimer=null}
-  if(min>0)_autoTimer=setInterval(()=>loadFromJson(true),min*60*1000);
+  if(min>0)_autoTimer=setInterval(()=>load(true),min*60*1000);
 }
 
-$("bRefresh").addEventListener("click",()=>loadFromAppsScript(false));
+$("bRefresh").addEventListener("click",()=>load(false));
 $("autoSel").addEventListener("change",function(){startAutoRefresh(parseInt(this.value)||0)});
 
 /* Зум: используется нативный зум браузера (Ctrl+Scroll / Ctrl+/−).
