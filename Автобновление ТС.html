@@ -1,0 +1,1322 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Расходы по ТС</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+<style>
+:root{--bg:#edf3fc;--panel:#fff;--ln:#5f739a;--ln2:#415982;--tx:#112345;--mt:#435578;--ok:#1e8a54;--err:#b33d4e}
+*{box-sizing:border-box}
+html{overflow-x:auto;overflow-y:auto}
+body{margin:0;font-family:"Segoe UI",Tahoma,sans-serif;background:var(--bg);color:var(--tx);font-size:12px;min-width:600px;overflow-x:auto;overflow-y:auto}
+.wrap{padding:10px}
+.card{background:var(--panel);border:2px solid var(--ln2);border-radius:12px;overflow:hidden;box-shadow:0 6px 14px rgba(40,64,112,.12)}
+.toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:8px 12px;border-bottom:2px solid var(--ln);background:linear-gradient(180deg,#f0f5ff,#e3edff)}
+.title{margin:0;font-size:16px;font-weight:900;color:#102858}
+.btn{border:2px solid var(--ln2);background:#f8fbff;color:var(--tx);border-radius:8px;padding:5px 9px;font-weight:800;cursor:pointer;font-size:11px}
+.btn.tab.active{background:#d7e5ff;color:#153468;border-color:#2f538f}
+.btn.sel-active{background:#fff0c2;border-color:#c49a1a;color:#6b4e00}
+.btn-undo{border-color:#8a7040;background:linear-gradient(180deg,#fff8e6,#fff0c2);color:#5c4a1a}
+.btn-undo:hover{background:#ffe9a0}
+.status{margin-left:auto;font-weight:800;font-size:11px;color:var(--mt)}
+.status.ok{color:var(--ok)}.status.err{color:var(--err)}
+.sel-badge{background:#ffeeba;color:#6b4e00;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;display:none}
+.sel-badge.active{display:inline}
+
+.summary-bar{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px;border-bottom:2px solid var(--ln);background:#f8fbff}
+.sc{border:2px solid #6b8ac0;border-radius:8px;padding:4px 10px;background:linear-gradient(180deg,#eef4ff,#dce8fc);min-width:90px}
+.sc-count{border-color:#2d68b8;background:linear-gradient(180deg,#d8eaff,#c0d8fc)}
+.sc-parts{border-color:#d4993a;background:linear-gradient(180deg,#fff0db,#ffe3bc)}
+.sc-amort{border-color:#4da65e;background:linear-gradient(180deg,#ddf7e0,#c8eecb)}
+.sc-fuel{border-color:#7b60c2;background:linear-gradient(180deg,#f0e5ff,#e2d2ff)}
+.sc-gas{border-color:#2a9e8a;background:linear-gradient(180deg,#d6f7f2,#bceee6)}
+.sc-total{border-color:#c25555;background:linear-gradient(180deg,#ffe0e0,#ffcaca)}
+.sc .sl{display:block;font-size:8px;font-weight:700;color:var(--mt);white-space:nowrap}
+.sc .sv{display:block;font-size:12px;font-weight:900;color:#0d2048}
+.sc.clickable{cursor:pointer;transition:filter .15s}
+.sc.clickable:hover{filter:brightness(.93)}
+.sc.clickable.drill-active{outline:2px solid #2f538f;box-shadow:0 0 0 3px rgba(47,83,143,.25)}
+
+.page{display:none}.page.active{display:block}
+.stitle{margin:8px 12px 3px;font-size:13px;font-weight:900;color:#102858}
+.tshell{max-height:58vh;overflow:auto;border:2px solid var(--ln);margin:0 8px 6px;border-radius:6px;scrollbar-width:auto;scrollbar-color:#8ea6d3 #e8edf7}
+.tshell::-webkit-scrollbar{width:14px;height:14px}
+.tshell::-webkit-scrollbar-track{background:#e8edf7;border-radius:6px}
+.tshell::-webkit-scrollbar-thumb{background:#8ea6d3;border-radius:6px;border:2px solid #e8edf7}
+.tshell::-webkit-scrollbar-thumb:hover{background:#6b8ac0}
+.tshell::-webkit-scrollbar-corner{background:#e8edf7}
+table{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%}
+th,td{border-right:1px solid #9ab0d6;border-bottom:1px solid #9ab0d6;padding:2px 5px;white-space:nowrap;font-size:10px;font-weight:800;color:var(--tx);background:#fff;text-rendering:optimizeLegibility}
+th:first-child,td:first-child{border-left:1px solid #9ab0d6}
+.head-row th{border-top:1px solid #9ab0d6}
+thead th{position:sticky;top:0;z-index:3}
+.h-default{background:linear-gradient(180deg,#e2ebfb,#cedcf6)}
+.h-parts{background:linear-gradient(180deg,#ffe9c7,#ffdbab)}
+.h-amort{background:linear-gradient(180deg,#dcf6df,#c6eccb)}
+.h-fuel-sum{background:linear-gradient(180deg,#eee2ff,#e0d0ff)}
+.h-fuel-liters{background:linear-gradient(180deg,#fff4d4,#ffeab8)}
+.h-gas-sum{background:linear-gradient(180deg,#d4f7f2,#b8ece4)}
+.h-gas-liters{background:linear-gradient(180deg,#ffdcec,#ffc7df)}
+.h-total{background:linear-gradient(180deg,#ffdada,#ffc2c2)}
+.fwrap{display:grid;gap:2px}
+.ftext{width:100%;background:#fff;border:1px solid #8ea6d3;border-radius:4px;font-size:9px;font-weight:700;padding:2px 3px;outline:none}
+.fselect{width:100%;background:#fff;border:1px solid #8ea6d3;border-radius:4px;font-size:9px;font-weight:700;padding:2px 3px;outline:none;height:20px}
+.sum-row th{background:linear-gradient(180deg,#e5f5d7,#d6edc3)!important;color:#144223;font-weight:900;font-size:10px}
+tbody tr:nth-child(even) td{background:#f6f9ff}
+tbody tr:hover td{background:#eaf2ff}
+tbody td{cursor:pointer}
+tbody td:hover{background:#dbeaff!important;outline:1px dashed #6b8ac0}
+
+.ch-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:8px 12px;margin:0 0 4px;background:linear-gradient(180deg,#eef4ff,#dde8fb);border-radius:8px;border:1px solid var(--ln2)}
+.ch-lbl{font-size:13px;font-weight:700;color:#264073}
+.ch-sel{padding:3px 6px;font-size:12px;font-weight:700;border:1px solid #8ea6d3;border-radius:4px;background:#fff;color:#264073}
+.ch-sz{min-width:32px;text-align:center;font-weight:900}
+.ch-sz.active{background:#3b6cb4;color:#fff}
+.charts-scroll{width:100%;overflow-x:auto;padding-bottom:6px;scrollbar-width:auto;scrollbar-color:#8ea6d3 #e8edf7}
+.charts-scroll::-webkit-scrollbar{height:12px}
+.charts-scroll::-webkit-scrollbar-track{background:#e8edf7;border-radius:6px}
+.charts-scroll::-webkit-scrollbar-thumb{background:#8ea6d3;border-radius:6px}
+.charts-grid{padding:18px;display:grid;gap:40px;grid-template-columns:1fr;min-width:700px}
+.chart-card{border:2px solid var(--ln2);border-radius:10px;background:linear-gradient(180deg,#f8fbff,#eef4ff);padding:20px 18px 14px;min-width:0;overflow:visible}
+.chart-card canvas{cursor:pointer}
+.ctitle{margin:0 0 10px;font-size:18px;font-weight:900;color:#173562}
+.canvas-wrap{height:420px;min-width:500px;overflow:visible}
+.pv-ch-scroll{width:100%;overflow-x:auto;padding-bottom:6px;scrollbar-width:auto;scrollbar-color:#8ea6d3 #e8edf7}
+.pv-ch-scroll::-webkit-scrollbar{height:12px}
+.pv-ch-scroll::-webkit-scrollbar-track{background:#e8edf7;border-radius:6px}
+.pv-ch-scroll::-webkit-scrollbar-thumb{background:#8ea6d3;border-radius:6px}
+.pv-ch-grid{padding:12px;display:grid;gap:36px;grid-template-columns:1fr;min-width:700px}
+.pv-ch-card{border:2px solid #b8cce4;border-radius:10px;background:linear-gradient(180deg,#fffef8,#f5f0e0);padding:16px;page-break-inside:avoid}
+.pv-ch-card canvas{cursor:pointer}
+.pv-ch-card .ctitle{font-size:16px;font-weight:900;color:#3d2e00;margin:0 0 8px}
+.pv-ch-card .canvas-wrap{height:420px;min-width:700px}
+.sortable{cursor:pointer;user-select:none;position:relative}
+.sortable:hover{filter:brightness(.91)}
+.sarr{font-size:7px;margin-left:2px;opacity:.7;vertical-align:middle}
+.cname{color:#1a5ab8;text-decoration:underline dotted rgba(26,90,184,.4);cursor:pointer}
+.cname:hover{color:#0d3a8a;background:#dbeaff!important}
+tr.selected td{background:#fff3cc!important}
+tr.selected .cname{font-weight:900;color:#7a5600}
+.pv-sep{margin:16px 10px 6px;padding:8px 14px;background:linear-gradient(90deg,#1a3870,#2d5aaf);color:#fff;border-radius:8px;font-size:14px;font-weight:900}
+.pv-hint{padding:8px 14px;color:var(--mt);font-weight:700;font-size:11px}
+.pvcard{margin:0 8px 8px;border:2px solid #c49a1a;border-radius:8px;background:linear-gradient(180deg,#fffef5,#fff8e0);overflow:hidden;display:none}
+.pvcard.active{display:block}
+.pvcard-head{display:flex;align-items:center;gap:10px;padding:6px 12px;background:linear-gradient(90deg,#ffeeba,#fff0c2);border-bottom:1px solid #d4b85c}
+.pvcard-title{flex:1;font-size:12px;font-weight:900;color:#5c4a1a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pvcard-body{padding:6px 10px;overflow-x:auto}
+.pvcard-body table{min-width:auto}
+.pvcard-body th{font-size:9px;background:linear-gradient(180deg,#fff4d4,#ffe9b8)}
+.pvcard-body td{font-size:9px;text-align:right}
+.pvcard-body .pvr-label{text-align:left;font-weight:900;background:linear-gradient(180deg,#fff4d4,#ffe9b8);white-space:nowrap}
+.pvcard-body .pvr-total td{background:#fff0c2;font-weight:900;color:#8a3a00}
+.pvcard-body .pvr-total .pvr-label{background:linear-gradient(180deg,#ffe0a0,#ffd480)}
+#pvT tbody tr{cursor:pointer}
+#pvT tbody tr:hover td{background:#fff3cc!important}
+</style>
+</head>
+<body>
+<div class="wrap"><div class="card">
+  <div class="toolbar">
+    <h1 class="title">Расходы по ТС</h1>
+    <button class="btn btn-undo" id="bUndo" style="display:none">← Назад</button>
+    <button class="btn tab active" id="bTab">Таблица</button>
+    <button class="btn tab" id="bCharts">Графики</button>
+    <label class="btn" for="csvIn">Загрузить CSV</label>
+    <input id="csvIn" type="file" accept=".csv" style="display:none"/>
+    <button class="btn" id="bClear">Сбросить фильтры</button>
+    <button class="btn" id="bSelAll">Все ТС</button>
+    <button class="btn" id="bSelApply" style="display:none">Применить выборку</button>
+    <button class="btn" id="bSelClear" style="display:none">Снять выборку</button>
+    <span class="sel-badge" id="selBadge"></span>
+    <span id="status" class="status">Загрузка...</span>
+    <button class="btn" id="bRefresh" title="Обновить из Google Sheets" style="margin-left:4px">🔄</button>
+    <select class="btn" id="autoSel" title="Автообновление" style="font-size:10px;padding:4px 6px">
+      <option value="0">Авто: выкл</option>
+      <option value="1">1 мин</option>
+      <option value="2">2 мин</option>
+      <option value="5">5 мин</option>
+      <option value="10">10 мин</option>
+    </select>
+  </div>
+  <div class="summary-bar" id="sumBar"></div>
+
+  <div id="pgTable" class="page active">
+    <p class="stitle">Общие данные по ТС <small style="font-weight:600;color:#435578">(клик = выборка строки; двойной клик = в фильтр колонки; *)</small></p>
+    <div class="tshell" id="shell1"><table id="t1"></table></div>
+    <p class="stitle">Расходы в динамике по годам <small style="font-weight:600;color:#435578">(клик = выборка; двойной клик = в фильтр, где есть фильтр)</small></p>
+    <div class="tshell" id="shell2"><table id="t2"></table></div>
+    <div id="sumDrill" style="display:none;margin:8px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <p class="stitle" id="sumDrillTitle" style="margin:0;flex:1"></p>
+        <button class="btn" id="sumDrillClose">✕ Закрыть</button>
+      </div>
+      <div class="tshell" style="max-height:45vh"><table id="sumDrillT"></table></div>
+    </div>
+  </div>
+
+  <div id="pgCharts" class="page">
+    <div class="ch-toolbar">
+      <span class="ch-lbl">Диапазон годов:</span>
+      <select id="yrFrom" class="ch-sel"></select>
+      <span class="ch-lbl">—</span>
+      <select id="yrTo" class="ch-sel"></select>
+      <button class="btn" id="bYrApply">Применить</button>
+      <button class="btn" id="bYrReset">Все года</button>
+      <span class="ch-lbl" style="margin-left:16px">Размер графиков:</span>
+      <button class="btn ch-sz" data-sz="s">S</button>
+      <button class="btn ch-sz active" data-sz="m">M</button>
+      <button class="btn ch-sz" data-sz="l">L</button>
+    </div>
+    <div class="charts-scroll"><div class="charts-grid">
+      <div class="chart-card"><p class="ctitle">Запчасти и услуги по годам</p><div class="canvas-wrap"><canvas id="c1"></canvas></div></div>
+      <div class="chart-card"><p class="ctitle">Амортизация по годам</p><div class="canvas-wrap"><canvas id="c2"></canvas></div></div>
+      <div class="chart-card"><p class="ctitle">Суммы топлива: бензин / газ</p><div class="canvas-wrap"><canvas id="c3"></canvas></div></div>
+      <div class="chart-card"><p class="ctitle">Объём топлива: бензин (л) / газ (куб.м)</p><div class="canvas-wrap"><canvas id="c4"></canvas></div></div>
+      <div class="chart-card"><p class="ctitle">Итого расходов по годам</p><div class="canvas-wrap"><canvas id="c5"></canvas></div></div>
+      <div class="chart-card"><p class="ctitle">Количество ТС по ЗУЭС</p><div class="canvas-wrap"><canvas id="c6"></canvas></div></div>
+      <div class="chart-card"><p class="ctitle">Количество ТС по маркам</p><div class="canvas-wrap"><canvas id="c7"></canvas></div></div>
+      <div class="chart-card"><p class="ctitle">ТС на гарантии (год выпуска ≥ 2025)</p><div class="canvas-wrap"><canvas id="c8"></canvas></div></div>
+    </div></div>
+    <div id="drillWrap" style="display:none;margin:8px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <p class="ctitle" id="drillTitle" style="margin:0;flex:1"></p>
+        <button class="btn" id="drillClose">✕ Закрыть</button>
+      </div>
+      <div class="tshell" style="max-height:45vh"><table id="drillT"></table></div>
+    </div>
+    <div class="pv-sep">Расходы в разрезе каждого ТС</div>
+    <div id="pvHint" class="pv-hint"></div>
+    <div id="pvWrap" style="display:none">
+      <div class="tshell" style="max-height:50vh"><table id="pvT"></table></div>
+      <div class="pvcard" id="pvCard">
+        <div class="pvcard-head">
+          <span class="pvcard-title" id="pvCardTitle"></span>
+          <button class="btn" id="pvCardClose">✕ Закрыть</button>
+        </div>
+        <div class="pvcard-body" id="pvCardBody"></div>
+      </div>
+      <div class="pv-ch-scroll"><div id="pvChGrid" class="pv-ch-grid"></div></div>
+    </div>
+  </div>
+</div></div>
+
+<script>
+const SID="1XtQFD6PBXsrt5n7V9YHvX_m4RCk2d3JaPwIlYVHD2x8",SGID="2035557245";
+const ANCHOR="автопогрузчик nissan yg1f2a30u";
+const $=id=>document.getElementById(id);
+function escHtml(s){return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
+const t1El=$("t1"),t2El=$("t2"),sumBar=$("sumBar"),statusEl=$("status");
+Chart.register(ChartDataLabels);
+
+let H=[],R=[],t1C=[],t2C=[],sumC=[];
+let t1Rows=[],t2Rows=[],filters=[],sumEls=[],t2SumCells=[];
+let numF=[];
+let ch={};
+let sortCol=-1,sortDir=0,sortHdrs=[];
+let nameColIdx=-1;
+let selected=new Set();
+let selApplied=false;
+let hist=[];
+const MAX_HIST=50;
+
+function stat(m,t){statusEl.textContent=m;statusEl.className="status"+(t?" "+t:"")}
+function pn(v){if(v==null)return 0;const r=String(v).replace(/\s/g,"").replace(",",".").replace(/[^\d.-]/g,"");const n=+r;return isFinite(n)?n:0}
+function fn(n){if(!isFinite(n)||n===0)return"";return n.toLocaleString("ru-RU",{maximumFractionDigits:2})}
+function fe(v){if(!v)return"";return Math.round(v).toLocaleString("ru-RU")}
+
+function saveState(){
+  hist.push({fv:filters.map(f=>f.input.value),sel:new Set(selected),sa:selApplied});
+  if(hist.length>MAX_HIST)hist.shift();
+  $("bUndo").style.display="";
+}
+
+function undo(){
+  if(!hist.length)return;
+  const s=hist.pop();
+  filters.forEach((f,i)=>{f.input.value=s.fv[i]||"";f.select.value=""});
+  selected.forEach(ri=>{
+    if(t1Rows[ri])t1Rows[ri].classList.remove("selected");
+    if(t2Rows[ri])t2Rows[ri].classList.remove("selected");
+  });
+  selected=s.sel;selApplied=s.sa;
+  selected.forEach(ri=>{
+    if(t1Rows[ri])t1Rows[ri].classList.add("selected");
+    if(t2Rows[ri])t2Rows[ri].classList.add("selected");
+  });
+  const n=selected.size;
+  const badge=$("selBadge"),bA=$("bSelApply"),bC=$("bSelClear");
+  if(n>0){badge.textContent="Выбрано: "+n+" ТС";badge.classList.add("active");bA.style.display="";bC.style.display=""}
+  else{badge.classList.remove("active");bA.style.display="none";bC.style.display="none"}
+  applyF();
+  $("bUndo").style.display=hist.length?"":"none";
+}
+
+function hcls(name){
+  const h=(name||"").toLowerCase();
+  if(h.includes("итого")||h.includes("всего"))return"h-total";
+  if(h.includes("запчаст"))return"h-parts";
+  if(h.includes("амортизац"))return"h-amort";
+  if(h.includes("бензин")&&h.includes("сум"))return"h-fuel-sum";
+  if(h.includes("газ")&&h.includes("сум"))return"h-gas-sum";
+  if(h.includes("бензин")&&(h.includes(" л")||h.includes("литр")))return"h-fuel-liters";
+  if(h.includes("газ")&&(h.includes("куб")||h.includes("м3")))return"h-gas-liters";
+  return"h-default";
+}
+
+function scCls(name){
+  const h=(name||"").toLowerCase();
+  if(h.includes("запчаст"))return"sc sc-parts";
+  if(h.includes("амортизац"))return"sc sc-amort";
+  if(h.includes("бензин"))return"sc sc-fuel";
+  if(h.includes("газ"))return"sc sc-gas";
+  if(/^итого$/.test(h.trim()))return"sc sc-total";
+  return"sc";
+}
+
+function parseGviz(t){const s=t.indexOf("{"),e=t.lastIndexOf("}");return JSON.parse(t.slice(s,e+1))}
+function cv(c){if(!c)return"";if(c.f!=null)return String(c.f);if(c.v==null)return"";return String(c.v)}
+
+function detectHdr(rows){
+  for(let i=0;i<Math.min(20,rows.length);i++){
+    const s=rows[i].join(" ").toLowerCase();
+    if(s.includes("наименование тс")||(s.includes("марка")&&s.includes("год")))return i;
+  }
+  return 0;
+}
+
+function trimVeh(rows){
+  return rows.filter(r=>/^\d+$/.test(String(r[0]||"").trim())&&String(r[1]||"").trim().length>2);
+}
+
+function normalize(cols,rows){
+  const ugly=cols.every(c=>!c||/^[a-z]+$/i.test(c.trim()));
+  let hd,rw;
+  if(!ugly){hd=cols;rw=rows}
+  else{const i=detectHdr(rows);hd=rows[i];rw=rows.slice(i+1)}
+  if(!(hd||[]).join(" ").toLowerCase().includes("наименование тс")){
+    const hi=rw.findIndex(r=>(r||[]).join(" ").toLowerCase().includes("наименование тс"));
+    if(hi>=0)hd=rw[hi];
+  }
+  rw=trimVeh(rw);
+  return{headers:hd,rows:rw};
+}
+
+function classify(){
+  const types=H.map(h=>{
+    const l=(h||"").toLowerCase();
+    if(/20\d{2}/.test(l))return"year";
+    if(l.includes("итого")||l.includes("всего"))return"sum";
+    if(l.includes("стоимость"))return"sum";
+    if(l.includes("пробег"))return"sum";
+    return"key";
+  });
+  t1C=[];sumC=[];const yC=[];
+  types.forEach((t,i)=>{if(t!=="year")t1C.push(i);if(t==="year")yC.push(i);if(t==="sum")sumC.push(i)});
+  const kC=[];
+  for(let i=0;i<types.length;i++){if(types[i]==="key")kC.push(i)}
+  t2C=[...kC,...yC];
+  numF=H.map((h,i)=>{
+    const l=(h||"").toLowerCase();
+    if(l.includes("наименование")||l.includes("закреплен")||l.includes("зуэс")||l.includes("марка"))return false;
+    let n=0,s=0;
+    for(let j=0;j<R.length&&s<120;j++){
+      const v=String(R[j][i]||"").trim();if(!v)continue;s++;
+      if(pn(v)!==0||/0[,.]?0*$/.test(v.replace(/\s/g,"")))n++;
+    }
+    return n>=Math.max(5,Math.floor(s*.45));
+  });
+  nameColIdx=H.findIndex(h=>(h||"").toLowerCase().includes("наименование"));
+  if(nameColIdx<0)nameColIdx=H.findIndex(h=>(h||"").toLowerCase().includes("количество тс"));
+  if(nameColIdx<0)nameColIdx=1;
+}
+
+function vehName(row){return(row[nameColIdx]||"").trim()}
+
+function uv(col){
+  const s=new Set();R.forEach(r=>s.add((r[col]||"").trim()));
+  return[...s].sort((a,b)=>a.localeCompare(b,"ru")).slice(0,800);
+}
+
+function addToFilter(col,val){
+  val=(val||"").trim();
+  if(!val)return;
+  const f=filters.find(f=>f.col===col);
+  if(!f)return;
+  saveState();
+  const cur=f.input.value.trim();
+  const parts=cur?cur.split("*").map(p=>p.trim()).filter(Boolean):[];
+  if(parts.some(p=>p.toLowerCase()===val.toLowerCase()))return;
+  parts.push(val);
+  f.input.value=parts.join("*");
+  applyF();
+}
+
+function toggleSel(ri){
+  saveState();
+  if(selected.has(ri))selected.delete(ri);
+  else selected.add(ri);
+  t1Rows[ri].classList.toggle("selected",selected.has(ri));
+  t2Rows[ri].classList.toggle("selected",selected.has(ri));
+  updSelUI();
+}
+
+function updSelUI(){
+  const n=selected.size;
+  const badge=$("selBadge"),bA=$("bSelApply"),bC=$("bSelClear");
+  if(n>0){
+    badge.textContent="Выбрано: "+n+" ТС";
+    badge.classList.add("active");bA.style.display="";bC.style.display="";
+  }else{
+    badge.classList.remove("active");bA.style.display="none";bC.style.display="none";
+    if(selApplied){selApplied=false;applyF()}
+  }
+}
+
+function applySel(){saveState();selApplied=true;applyF()}
+
+function selectAllVehicles(){
+  saveState();
+  selected.clear();
+  for(let i=0;i<R.length;i++){
+    selected.add(i);
+    if(t1Rows[i])t1Rows[i].classList.add("selected");
+    if(t2Rows[i])t2Rows[i].classList.add("selected");
+  }
+  updSelUI();
+  selApplied=true;
+  applyF();
+}
+
+function bindCellSelFilter(td,ri,ci,row,allowFilter){
+  let tmr,clk=0;
+  td.addEventListener("click",()=>{
+    clk++;
+    clearTimeout(tmr);
+    tmr=setTimeout(()=>{
+      if(clk===1)toggleSel(ri);
+      clk=0;
+    },280);
+  });
+  if(allowFilter){
+    td.addEventListener("dblclick",e=>{
+      e.preventDefault();
+      clearTimeout(tmr);
+      clk=0;
+      addToFilter(ci,(row[ci]||"").trim());
+    });
+  }
+}
+
+function clearSel(){
+  saveState();
+  selected.forEach(ri=>{
+    if(t1Rows[ri])t1Rows[ri].classList.remove("selected");
+    if(t2Rows[ri])t2Rows[ri].classList.remove("selected");
+  });
+  selected.clear();selApplied=false;updSelUI();applyF();
+}
+
+let _lastFilt=[];
+let _activeDrillCol=null;
+
+function buildSumBar(){
+  sumBar.innerHTML="";sumEls=[];
+  const mk=(label,cls,clickable)=>{
+    const d=document.createElement("div");d.className=cls+(clickable?" clickable":"");
+    const l=document.createElement("span");l.className="sl";l.textContent=label;
+    const v=document.createElement("span");v.className="sv";v.textContent="0";
+    d.appendChild(l);d.appendChild(v);sumBar.appendChild(d);
+    return{valEl:v,div:d};
+  };
+  const cnt=mk("Количество ТС","sc sc-count",false);
+  sumEls.push({type:"count",el:cnt.valEl,div:cnt.div});
+  sumC.forEach(ci=>{
+    const nm=H[ci]||"";
+    const {valEl,div}=mk(nm,scCls(nm),true);
+    div.addEventListener("click",()=>showSumDrill(ci,nm,div));
+    sumEls.push({type:"sum",col:ci,el:valEl,div});
+  });
+}
+
+function showSumDrill(col,label,divEl){
+  // Снять активность с предыдущего
+  sumEls.forEach(s=>{if(s.div)s.div.classList.remove("drill-active")});
+  const wrap=$("sumDrill"),tbl=$("sumDrillT"),title=$("sumDrillTitle");
+  if(_activeDrillCol===col){
+    // повторный клик — закрыть
+    wrap.style.display="none";_activeDrillCol=null;return;
+  }
+  _activeDrillCol=col;
+  divEl.classList.add("drill-active");
+  title.textContent="Итог по: "+label;
+  const items=_lastFilt.map(r=>({name:vehName(r),val:pn(r[col])}))
+    .filter(x=>x.val!==0).sort((a,b)=>b.val-a.val);
+  let sum=0;items.forEach(x=>sum+=x.val);
+  let html='<thead><tr class="head-row"><th class="h-default">Наименование ТС</th><th class="'+hcls(label)+'" style="text-align:right">'+escHtml(label)+'</th></tr></thead>';
+  html+='<tbody>';
+  items.forEach(x=>{html+='<tr><td>'+escHtml(x.name)+'</td><td style="text-align:right">'+fn(x.val)+'</td></tr>'});
+  html+='</tbody><tfoot><tr class="sum-row"><th>ИТОГО ('+items.length+' ТС)</th><th style="text-align:right">'+fn(sum)+'</th></tr></tfoot>';
+  tbl.innerHTML=html;
+  wrap.style.display="";
+  wrap.scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+
+$("sumDrillClose").addEventListener("click",()=>{
+  $("sumDrill").style.display="none";
+  _activeDrillCol=null;
+  sumEls.forEach(s=>{if(s.div)s.div.classList.remove("drill-active")});
+});
+
+function buildT1(){
+  filters=[];t1Rows=[];sortHdrs=[];sortCol=-1;sortDir=0;
+  const thead=document.createElement("thead");
+  const trH=document.createElement("tr");trH.className="head-row";
+  const trF=document.createElement("tr");trF.className="filter-row";
+
+  t1C.forEach(ci=>{
+    const th=document.createElement("th");th.className=hcls(H[ci])+" sortable";
+    th.textContent=H[ci]||"";
+    const arr=document.createElement("span");arr.className="sarr";th.appendChild(arr);
+    th.addEventListener("click",()=>sortBy(ci));
+    sortHdrs.push({th,col:ci});
+    trH.appendChild(th);
+    const fth=document.createElement("th");fth.className="h-default";
+    const w=document.createElement("div");w.className="fwrap";
+    const inp=document.createElement("input");inp.className="ftext";inp.placeholder="Содержит... (разд. *)";
+    const sel=document.createElement("select");sel.className="fselect";
+    const oa=document.createElement("option");oa.value="";oa.textContent="— Выбрать —";sel.appendChild(oa);
+    uv(ci).forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=v||"(пусто)";sel.appendChild(o)});
+    inp.addEventListener("input",applyF);
+    sel.addEventListener("change",()=>{const v=sel.value;if(!v)return;addToFilter(ci,v);sel.value=""});
+    filters.push({input:inp,select:sel,col:ci});
+    w.appendChild(inp);w.appendChild(sel);fth.appendChild(w);trF.appendChild(fth);
+  });
+  thead.appendChild(trH);thead.appendChild(trF);
+
+  const tbody=document.createElement("tbody");
+  R.forEach((row,ri)=>{
+    const tr=document.createElement("tr");
+    t1C.forEach(ci=>{
+      const td=document.createElement("td");td.textContent=row[ci]||"";
+      if(ci===nameColIdx)td.className="cname";
+      bindCellSelFilter(td,ri,ci,row,true);
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);t1Rows.push(tr);
+  });
+  t1El.innerHTML="";t1El.appendChild(thead);t1El.appendChild(tbody);
+  requestAnimationFrame(()=>{
+    const h=trH.offsetHeight;
+    trF.querySelectorAll("th").forEach(th=>{th.style.top=h+"px";th.style.zIndex="2"});
+  });
+}
+
+function buildT2(){
+  t2Rows=[];t2SumCells=[];
+  const thead=document.createElement("thead");
+  const trH=document.createElement("tr");trH.className="head-row";
+  const trS=document.createElement("tr");trS.className="sum-row";
+
+  t2C.forEach((ci,ti)=>{
+    const th=document.createElement("th");th.className=hcls(H[ci])+" sortable";
+    th.textContent=H[ci]||"";
+    const arr=document.createElement("span");arr.className="sarr";th.appendChild(arr);
+    th.addEventListener("click",()=>sortBy(ci));
+    sortHdrs.push({th,col:ci});
+    trH.appendChild(th);
+    const sth=document.createElement("th");
+    if(ti===0){sth.textContent="ИТОГО (фильтр)";sth.style.background="linear-gradient(180deg,#d4edbd,#c5e3a7)"}
+    t2SumCells.push({el:sth,col:ci});
+    trS.appendChild(sth);
+  });
+  thead.appendChild(trH);thead.appendChild(trS);
+
+  requestAnimationFrame(()=>{
+    const h=trH.offsetHeight;
+    trS.querySelectorAll("th").forEach(th=>{th.style.top=h+"px";th.style.zIndex="2"});
+  });
+
+  const tbody=document.createElement("tbody");
+  R.forEach((row,ri)=>{
+    const tr=document.createElement("tr");
+    t2C.forEach(ci=>{
+      const td=document.createElement("td");td.textContent=row[ci]||"";
+      if(ci===nameColIdx)td.className="cname";
+      bindCellSelFilter(td,ri,ci,row,filters.some(f=>f.col===ci));
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);t2Rows.push(tr);
+  });
+  t2El.innerHTML="";t2El.appendChild(thead);t2El.appendChild(tbody);
+}
+
+function applyF(){
+  const cfg=filters.map(f=>{
+    const raw=f.input.value.trim().toLowerCase();
+    const parts=raw?raw.split("*").map(p=>p.trim()).filter(Boolean):[];
+    return{parts,c:f.col};
+  });
+  let vis=0;const filt=[];
+  for(let i=0;i<R.length;i++){
+    const row=R[i];
+    let ok=cfg.every(c=>{
+      if(c.parts.length===0)return true;
+      const v=(row[c.c]||"").trim().toLowerCase();
+      return c.parts.some(p=>v.includes(p));
+    });
+    if(ok&&selApplied&&selected.size>0)ok=selected.has(i);
+    const d=ok?"":"none";
+    t1Rows[i].style.display=d;
+    t2Rows[i].style.display=d;
+    if(ok){vis++;filt.push(row)}
+  }
+  stat("Показано строк: "+vis+" / "+R.length,"ok");
+  updSum(filt);
+  updT2Sum(filt);
+  updCharts(filt);
+  buildPvTable(filt);
+}
+
+function updSum(filt){
+  _lastFilt=filt;
+  sumEls.forEach(s=>{
+    if(s.type==="count"){s.el.textContent=filt.length;return}
+    let sum=0;filt.forEach(r=>{sum+=pn(r[s.col])});
+    s.el.textContent=fn(sum);
+  });
+  // Если итоговая панель открыта — обновить её
+  if(_activeDrillCol!=null&&$("sumDrill").style.display!=="none"){
+    const se=sumEls.find(s=>s.col===_activeDrillCol);
+    if(se)showSumDrill(_activeDrillCol,H[_activeDrillCol]||"",se.div);
+  }
+}
+
+function updT2Sum(filt){
+  t2SumCells.forEach((s,ti)=>{
+    if(ti===0)return;
+    // Суммируем если: явно числовой столбец, ИЛИ заголовок содержит год (20xx)
+    const isYear=/(20\d{2})/.test((H[s.col]||"").toLowerCase());
+    if(!numF[s.col]&&!isYear){s.el.textContent="";return}
+    let sum=0;filt.forEach(r=>{sum+=pn(r[s.col])});
+    s.el.textContent=sum?fn(sum):"";
+  });
+}
+
+function clearF(){
+  saveState();
+  filters.forEach(f=>{f.input.value="";f.select.value=""});
+  sortCol=-1;sortDir=0;updSortInd();
+  selected.forEach(ri=>{
+    if(t1Rows[ri])t1Rows[ri].classList.remove("selected");
+    if(t2Rows[ri])t2Rows[ri].classList.remove("selected");
+  });
+  selected.clear();selApplied=false;updSelUI();
+  applyF();
+}
+
+function sortBy(col){
+  if(sortCol===col){sortDir=sortDir===1?-1:sortDir===-1?0:1}
+  else{sortCol=col;sortDir=1}
+  const idx=R.map((_,i)=>i);
+  if(sortDir!==0){
+    const isN=numF[col];
+    idx.sort((a,b)=>{
+      const va=R[a][col]||"",vb=R[b][col]||"";
+      if(isN)return(pn(va)-pn(vb))*sortDir;
+      return String(va).localeCompare(String(vb),"ru")*sortDir;
+    });
+  }
+  const tb1=t1El.querySelector("tbody"),tb2=t2El.querySelector("tbody");
+  idx.forEach(i=>{tb1.appendChild(t1Rows[i]);tb2.appendChild(t2Rows[i])});
+  updSortInd();
+}
+
+function updSortInd(){
+  sortHdrs.forEach(({th,col})=>{
+    const s=th.querySelector(".sarr");
+    if(!s)return;
+    if(col===sortCol&&sortDir===1)s.textContent=" ▲";
+    else if(col===sortCol&&sortDir===-1)s.textContent=" ▼";
+    else s.textContent="";
+  });
+}
+
+function rowMetrics(row){
+  let parts=0,amort=0,bSum=0,gSum=0;
+  H.forEach((h,col)=>{
+    const t=(h||"").toLowerCase();
+    if(!/(20\d{2})/.test(t))return;
+    const v=pn(row[col]);if(!v)return;
+    if(t.includes("запчаст"))parts+=v;
+    else if(t.includes("амортизац"))amort+=v;
+    else if(t.includes("бензин")&&t.includes("сум"))bSum+=v;
+    else if(t.includes("газ")&&t.includes("сум"))gSum+=v;
+  });
+  return{parts,amort,bSum,gSum,total:parts+amort+bSum+gSum};
+}
+
+function buildPvTable(rows){
+  const hint=$("pvHint"),wrap=$("pvWrap"),tbl=$("pvT");
+  $("pvCard").classList.remove("active");
+  if(rows.length===0||(rows.length===R.length&&!selApplied)){
+    hint.textContent="Примените фильтр или выборку для отображения расходов в разрезе ТС";
+    hint.style.display="";wrap.style.display="none";
+    pvChArr.forEach(c=>c.destroy());pvChArr=[];
+    $("pvChGrid").innerHTML="";
+    return;
+  }
+  hint.style.display="none";wrap.style.display="";
+
+  const thead=document.createElement("thead");
+  const trH=document.createElement("tr");trH.className="head-row";
+  const cols=["Наименование ТС","Запчасти и услуги","Амортизация","Бензин ₽","Газ ₽","ИТОГО"];
+  const clss=["h-default","h-parts","h-amort","h-fuel-sum","h-gas-sum","h-total"];
+  const keys=["name","parts","amort","bSum","gSum","total"];
+
+  const rData=rows.map(row=>{const m=rowMetrics(row);return{row,name:vehName(row),parts:m.parts,amort:m.amort,bSum:m.bSum,gSum:m.gSum,total:m.total}});
+
+  let pvSortCol=-1,pvSortDir=0;
+
+  cols.forEach((c,i)=>{
+    const th=document.createElement("th");th.className=clss[i]+" sortable";
+    th.innerHTML=c+'<span class="sarr"></span>';
+    th.addEventListener("click",()=>{
+      if(pvSortCol===i){pvSortDir=pvSortDir===1?-1:pvSortDir===-1?0:1}else{pvSortCol=i;pvSortDir=1}
+      renderPvRows();
+    });
+    trH.appendChild(th);
+  });
+
+  const trS=document.createElement("tr");trS.className="sum-row";
+  let sP=0,sA=0,sB=0,sG=0,sT=0;
+  rData.forEach(d=>{sP+=d.parts;sA+=d.amort;sB+=d.bSum;sG+=d.gSum;sT+=d.total});
+  thead.appendChild(trH);
+
+  const tbody=document.createElement("tbody");
+
+  function renderPvRows(){
+    let sorted=[...rData];
+    if(pvSortDir!==0){
+      const k=keys[pvSortCol];
+      sorted.sort((a,b)=>{
+        if(k==="name")return String(a.name).localeCompare(String(b.name),"ru")*pvSortDir;
+        return(a[k]-b[k])*pvSortDir;
+      });
+    }
+    tbody.innerHTML="";
+    sorted.forEach(d=>{
+      const tr=document.createElement("tr");
+      const vals=[d.name,fn(d.parts),fn(d.amort),fn(d.bSum),fn(d.gSum),fn(d.total)];
+      vals.forEach((v,i)=>{const td=document.createElement("td");td.textContent=v;if(i>0)td.style.textAlign="right";tr.appendChild(td)});
+      tr.addEventListener("click",()=>showPvCard(d.row));
+      tbody.appendChild(tr);
+    });
+    trH.querySelectorAll(".sarr").forEach((s,i)=>{
+      s.textContent=i===pvSortCol?(pvSortDir===1?" ▲":pvSortDir===-1?" ▼":""):"";
+    });
+  }
+  renderPvRows();
+
+  [["ИТОГО ("+rows.length+" ТС)",fn(sP),fn(sA),fn(sB),fn(sG),fn(sT)]].forEach(vals=>{
+    vals.forEach((v,i)=>{const th=document.createElement("th");th.textContent=v;if(i>0)th.style.textAlign="right";trS.appendChild(th)});
+  });
+  thead.appendChild(trS);
+
+  tbl.innerHTML="";tbl.appendChild(thead);tbl.appendChild(tbody);
+
+  requestAnimationFrame(()=>{
+    const h=trH.offsetHeight;
+    trS.querySelectorAll("th").forEach(th=>{th.style.top=h+"px";th.style.zIndex="2"});
+  });
+
+  buildPvCharts(rows);
+}
+
+function showPvCard(row){
+  const card=$("pvCard"),title=$("pvCardTitle"),body=$("pvCardBody");
+  title.textContent=vehName(row)||"ТС";
+  const{years,by}=extractYM([row]);
+  if(!years.length){body.innerHTML="<p>Нет данных по годам</p>";card.classList.add("active");return}
+
+  let html='<table><thead><tr><th class="pvr-label">Категория</th>';
+  years.forEach(y=>{html+='<th>'+y+'</th>'});
+  html+='<th style="background:linear-gradient(180deg,#ffdada,#ffc2c2)">ИТОГО</th></tr></thead><tbody>';
+
+  const cats=[
+    {key:"parts",label:"Запчасти и услуги"},
+    {key:"amort",label:"Амортизация"},
+    {key:"bSum",label:"Бензин ₽"},
+    {key:"gSum",label:"Газ ₽"}
+  ];
+  cats.forEach(c=>{
+    html+='<tr><td class="pvr-label">'+c.label+'</td>';
+    let sum=0;
+    years.forEach(y=>{const v=by[y]?by[y][c.key]:0;sum+=v;html+='<td>'+fn(v)+'</td>'});
+    html+='<td style="font-weight:900;background:#fff0c2">'+fn(sum)+'</td></tr>';
+  });
+
+  html+='<tr class="pvr-total"><td class="pvr-label">ИТОГО</td>';
+  let gt=0;
+  years.forEach(y=>{
+    const d=by[y]||{parts:0,amort:0,bSum:0,gSum:0};
+    const v=d.parts+d.amort+d.bSum+d.gSum;gt+=v;
+    html+='<td>'+fn(v)+'</td>';
+  });
+  html+='<td>'+fn(gt)+'</td></tr></tbody></table>';
+
+  body.innerHTML=html;
+  card.classList.add("active");
+  card.scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+
+let pvChArr=[];
+function buildPvCharts(rows){
+  pvChArr.forEach(c=>c.destroy());pvChArr=[];
+  const grid=$("pvChGrid");grid.innerHTML="";
+  if(!rows.length)return;
+
+  const yr=getYearRange();
+  let yrRange=[];
+  H.forEach(h=>{const m=(h||"").toLowerCase().match(/(20\d{2})/);if(m&&!yrRange.includes(m[1]))yrRange.push(m[1])});
+  yrRange.sort();
+  if(yr.length)yrRange=yrRange.filter(y=>yr.includes(y));
+  if(!yrRange.length)return;
+
+  rows.forEach(row=>{
+    const name=vehName(row)||"ТС";
+    const{by}=extractYM([row]);
+    const pa=yrRange.map(y=>by[y]?by[y].parts:0);
+    const am=yrRange.map(y=>by[y]?by[y].amort:0);
+    const bS=yrRange.map(y=>by[y]?by[y].bSum:0);
+    const gS=yrRange.map(y=>by[y]?by[y].gSum:0);
+    const tot=yrRange.map((_,i)=>pa[i]+am[i]+bS[i]+gS[i]);
+
+    const card=document.createElement("div");card.className="pv-ch-card";
+    const ttl=document.createElement("p");ttl.className="ctitle";ttl.textContent=name;
+    const wrap=document.createElement("div");wrap.className="canvas-wrap";
+    wrap.style.height=SZ_MAP[curSz]+"px";
+    const cvs=document.createElement("canvas");
+    wrap.appendChild(cvs);card.appendChild(ttl);card.appendChild(wrap);grid.appendChild(card);
+
+    const mx=Math.max(...tot,1);
+    const segVis=ctx=>{const v=ctx.dataset.data[ctx.dataIndex];return v>0&&(v/mx)>0.05};
+
+    const c=new Chart(cvs,{
+      type:"bar",
+      data:{labels:yrRange,datasets:[
+        {label:"Запчасти",data:pa,backgroundColor:"rgba(255,185,94,.8)",borderColor:"#e6960a",borderWidth:1,stack:"s",order:2,
+          datalabels:{color:"#7a4e00",anchor:"center",align:"center",font:{size:12,weight:"bold"},formatter:fe,display:segVis}},
+        {label:"Амортизация",data:am,backgroundColor:"rgba(127,211,156,.8)",borderColor:"#3a9960",borderWidth:1,stack:"s",order:2,
+          datalabels:{color:"#1a5e30",anchor:"center",align:"center",font:{size:12,weight:"bold"},formatter:fe,display:segVis}},
+        {label:"Бензин ₽",data:bS,backgroundColor:"rgba(155,136,255,.75)",borderColor:"#6a52e0",borderWidth:1,stack:"s",order:2,
+          datalabels:{color:"#2a1a80",anchor:"center",align:"center",font:{size:12,weight:"bold"},formatter:fe,display:segVis}},
+        {label:"Газ ₽",data:gS,backgroundColor:"rgba(77,196,176,.75)",borderColor:"#1a8a70",borderWidth:1,stack:"s",order:2,
+          datalabels:{color:"#0a4a3a",anchor:"center",align:"center",font:{size:12,weight:"bold"},formatter:fe,display:segVis}},
+        {label:"ИТОГО",data:tot,type:"line",borderColor:"#d63384",backgroundColor:"transparent",
+          borderWidth:2.5,tension:.3,pointRadius:3,pointHoverRadius:5,pointBackgroundColor:"#d63384",order:1,
+          datalabels:{color:"#8a1050",anchor:"end",align:"top",offset:8,clamp:true,font:{size:14,weight:"900"},formatter:fe,display:ctx=>ctx.dataset.data[ctx.dataIndex]>0}}
+      ]},
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        clip:false,
+        layout:{padding:{top:36,right:16,left:4}},
+        datasets:{bar:{categoryPercentage:0.68,barPercentage:0.78}},
+        scales:{
+          x:{ticks:{color:"#264073",font:{size:14,weight:"700"},maxRotation:0,minRotation:0},stacked:true},
+          y:{ticks:{color:"#264073",font:{size:14,weight:"700"}},grid:{color:"rgba(46,84,144,.15)"},stacked:true}
+        },
+        plugins:{
+          legend:{position:"bottom",labels:{color:"#173563",boxWidth:14,font:{size:14,weight:"800"},padding:6}},
+          tooltip:{backgroundColor:"rgba(16,40,88,.92)",titleFont:{size:15,weight:"900"},bodyFont:{size:15,weight:"700"},
+            callbacks:{label:ctx=>ctx.dataset.label+": "+fn(ctx.parsed.y)}},
+          datalabels:{}
+        },
+        onClick:(evt,elems,ch)=>{
+          if(!elems.length)return;
+          const yi=elems[0].index;
+          const y=ch.data.labels[yi];
+          if(y)showDrillVehicleYear(row,y);
+        }
+      }
+    });
+    pvChArr.push(c);
+  });
+}
+
+function parseCsvLine(line,sep){
+  const out=[];let c="",i=0,q=false;
+  while(i<line.length){
+    const ch=line[i],nx=line[i+1];
+    if(ch==='"'){if(q&&nx==='"'){c+='"';i+=2;continue}q=!q;i++;continue}
+    if(ch===sep&&!q){out.push(c);c="";i++;continue}
+    c+=ch;i++;
+  }
+  out.push(c);return out.map(x=>x.trim());
+}
+
+function parseCsv(text){
+  const lines=text.replace(/\r\n/g,"\n").replace(/\r/g,"\n").split("\n").filter(l=>l.trim());
+  if(!lines.length)throw new Error("CSV пустой");
+  const sep=(lines[0].match(/;/g)||[]).length>(lines[0].match(/,/g)||[]).length?";":",";
+  return lines.map(l=>parseCsvLine(l,sep));
+}
+
+function switchTab(name){
+  const isTbl=name==="table";
+  $("pgTable").classList.toggle("active",isTbl);
+  $("pgCharts").classList.toggle("active",!isTbl);
+  $("bTab").classList.toggle("active",isTbl);
+  $("bCharts").classList.toggle("active",!isTbl);
+  if(!isTbl){const f=getFiltered();updCharts(f);buildPvTable(f)}
+}
+
+function getFiltered(){
+  const out=[];
+  for(let i=0;i<R.length;i++){if(t1Rows[i].style.display!=="none")out.push(R[i])}
+  return out;
+}
+
+function mkCh(key,id,type,data,opts){
+  if(ch[key]){
+    if(ch[key].config.type!==type){ch[key].destroy();delete ch[key]}
+    else{ch[key].data=data;ch[key].options=opts;ch[key].update();return}
+  }
+  ch[key]=new Chart($(id),{type,data,options:opts});
+}
+
+function chOpts(){
+  return{
+    responsive:true,maintainAspectRatio:false,
+    clip:false,
+    layout:{padding:{top:44,right:28,left:6,bottom:6}},
+    datasets:{
+      bar:{categoryPercentage:0.60,barPercentage:0.72}
+    },
+    scales:{
+      x:{ticks:{color:"#264073",font:{size:13,weight:"700"},maxRotation:0,minRotation:0}},
+      y:{ticks:{color:"#264073",font:{size:13,weight:"700"}},grid:{color:"rgba(46,84,144,.2)"},
+        grace:"22%",
+        afterFit:scale=>{scale.paddingTop=0}}
+    },
+    plugins:{
+      legend:{labels:{color:"#173563",boxWidth:16,font:{size:14,weight:"800"},padding:10}},
+      tooltip:{backgroundColor:"rgba(16,40,88,.92)",titleFont:{size:15,weight:"900"},bodyFont:{size:15,weight:"700"},
+        callbacks:{label:ctx=>{const v=ctx.parsed.y!=null?ctx.parsed.y:ctx.parsed;return ctx.dataset.label+": "+fn(v)}}},
+      datalabels:{color:"#1a3060",font:{size:12,weight:"bold"},anchor:"end",align:"end",offset:5,clamp:true,
+        rotation:0,
+        formatter:fe,display:ctx=>ctx.dataset.data[ctx.dataIndex]>0}
+    }
+  };
+}
+
+function extractYM(rows){
+  const by={};
+  const add=(y,k,v)=>{if(!by[y])by[y]={parts:0,amort:0,bSum:0,gSum:0,bL:0,gM:0};by[y][k]+=v};
+  H.forEach((h,col)=>{
+    const t=(h||"").toLowerCase(),m=t.match(/(20\d{2})/);if(!m)return;
+    const y=m[1];
+    rows.forEach(r=>{
+      const v=pn(r[col]);if(!v)return;
+      if(t.includes("запчаст"))add(y,"parts",v);
+      else if(t.includes("амортизац"))add(y,"amort",v);
+      else if(t.includes("бензин")&&t.includes("сум"))add(y,"bSum",v);
+      else if(t.includes("газ")&&t.includes("сум"))add(y,"gSum",v);
+      else if(t.includes("бензин")&&(t.includes(" л")||t.includes("литр")))add(y,"bL",v);
+      else if(t.includes("газ")&&(t.includes("куб")||t.includes("м3")))add(y,"gM",v);
+    });
+  });
+  return{years:Object.keys(by).sort(),by};
+}
+
+function zuesCnt(rows){
+  const idx=H.findIndex(h=>(h||"").toLowerCase().includes("зуэс"));
+  if(idx<0)return{l:[],v:[]};
+  const mp=new Map();
+  rows.forEach(r=>{const k=(r[idx]||"").trim()||"(пусто)";mp.set(k,(mp.get(k)||0)+1)});
+  const a=[...mp.entries()].sort((a,b)=>b[1]-a[1]).slice(0,20);
+  return{l:a.map(x=>x[0]),v:a.map(x=>x[1])};
+}
+
+function brandCnt(rows){
+  const idx=H.findIndex(h=>(h||"").toLowerCase().includes("марка"));
+  if(idx<0)return{l:[],v:[]};
+  const mp=new Map();
+  rows.forEach(r=>{const k=(r[idx]||"").trim()||"(пусто)";mp.set(k,(mp.get(k)||0)+1)});
+  const a=[...mp.entries()].sort((a,b)=>b[1]-a[1]).slice(0,25);
+  return{l:a.map(x=>x[0]),v:a.map(x=>x[1])};
+}
+
+function warrantyCnt(rows){
+  let idx=H.findIndex(h=>{const l=(h||"").toLowerCase();return l.includes("год")&&(l.includes("выпуск")||l.includes("вып"))});
+  if(idx<0)idx=H.findIndex(h=>(h||"").toLowerCase().includes("год"));
+  if(idx<0)return{w:0,nw:0};
+  let w=0,nw=0;
+  rows.forEach(r=>{const y=parseInt(String(r[idx]||"").trim());if(isFinite(y)&&y>=2025)w++;else nw++});
+  return{w,nw};
+}
+
+function pieOpts(){
+  return{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{
+      legend:{position:"bottom",labels:{color:"#173563",font:{size:15,weight:"800"},padding:16}},
+      tooltip:{backgroundColor:"rgba(16,40,88,.92)",titleFont:{size:15,weight:"900"},bodyFont:{size:15,weight:"700"},
+        callbacks:{label:ctx=>{const v=ctx.parsed;return ctx.label+": "+fn(v)}}},
+      datalabels:{color:"#fff",font:{size:18,weight:"bold"},
+        formatter:(v,ctx)=>{const s=ctx.dataset.data.reduce((a,b)=>a+b,0);return v?fe(v)+" ("+(v/s*100).toFixed(1)+"%)":""},
+        textStrokeColor:"rgba(0,0,0,.3)",textStrokeWidth:2}
+    }
+  };
+}
+
+let lastChartRows=[];
+
+function drillExtract(row,year,metric){
+  const{by}=extractYM([row]);
+  const d=by[year]||{parts:0,amort:0,bSum:0,gSum:0,bL:0,gM:0};
+  if(metric==="parts")return d.parts;
+  if(metric==="amort")return d.amort;
+  if(metric==="bSum")return d.bSum;
+  if(metric==="gSum")return d.gSum;
+  if(metric==="bL")return d.bL;
+  if(metric==="gM")return d.gM;
+  if(metric==="total")return d.parts+d.amort+d.bSum+d.gSum;
+  return 0;
+}
+
+function showDrill(year,metric,title){
+  const wrap=$("drillWrap"),tbl=$("drillT");
+  $("drillTitle").textContent=title+" — "+year;
+  const items=lastChartRows.map(row=>({
+    name:vehName(row),
+    val:drillExtract(row,year,metric),
+    row
+  })).filter(x=>x.val!==0).sort((a,b)=>b.val-a.val);
+
+  let html='<thead><tr class="head-row"><th class="h-default">Наименование ТС</th><th class="h-total" style="text-align:right">'+escHtml(title)+'</th></tr></thead><tbody>';
+  let sum=0;
+  items.forEach(x=>{sum+=x.val;html+='<tr><td>'+escHtml(x.name)+'</td><td style="text-align:right">'+fn(x.val)+'</td></tr>'});
+  html+='</tbody><tfoot><tr class="sum-row"><th>ИТОГО ('+items.length+' ТС)</th><th style="text-align:right">'+fn(sum)+'</th></tr></tfoot>';
+  tbl.innerHTML=html;
+  wrap.style.display="";
+  wrap.scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+
+function drillColMatch(row,colIdx,want){
+  const v=(row[colIdx]||"").trim();
+  if(want==="(пусто)")return!v;
+  return v===want;
+}
+
+function showDrillCategory(colIdx,categoryLabel,titlePrefix){
+  if(colIdx<0)return;
+  const items=lastChartRows.filter(r=>drillColMatch(r,colIdx,categoryLabel))
+    .map(r=>vehName(r)).filter(Boolean).sort((a,b)=>a.localeCompare(b,"ru"));
+  const wrap=$("drillWrap"),tbl=$("drillT");
+  $("drillTitle").textContent=titlePrefix+" — "+categoryLabel+" ("+items.length+" ТС)";
+  let html='<thead><tr class="head-row"><th class="h-default">Наименование ТС</th></tr></thead><tbody>';
+  items.forEach(n=>{html+="<tr><td>"+escHtml(n)+"</td></tr>"});
+  html+="</tbody>";
+  tbl.innerHTML=html;
+  wrap.style.display="";
+  wrap.scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+
+function warrantyYearCol(){
+  let idx=H.findIndex(h=>{const l=(h||"").toLowerCase();return l.includes("год")&&(l.includes("выпуск")||l.includes("вып"))});
+  if(idx<0)idx=H.findIndex(h=>(h||"").toLowerCase().includes("год"));
+  return idx;
+}
+
+function showDrillWarranty(isGte2025){
+  const yi=warrantyYearCol();
+  const wrap=$("drillWrap"),tbl=$("drillT");
+  const title=isGte2025?"На гарантии (год выпуска ≥ 2025)":"Без гарантии (год выпуска < 2025)";
+  let items;
+  if(yi<0)items=lastChartRows.map(r=>vehName(r));
+  else{
+    items=lastChartRows.filter(r=>{
+      const y=parseInt(String(r[yi]||"").trim());
+      if(isGte2025)return isFinite(y)&&y>=2025;
+      return!isFinite(y)||y<2025;
+    }).map(r=>vehName(r));
+  }
+  items=items.filter(Boolean).sort((a,b)=>a.localeCompare(b,"ru"));
+  $("drillTitle").textContent=title+" ("+items.length+" ТС)";
+  let html='<thead><tr class="head-row"><th class="h-default">Наименование ТС</th></tr></thead><tbody>';
+  items.forEach(n=>{html+="<tr><td>"+escHtml(n)+"</td></tr>"});
+  html+="</tbody>";
+  tbl.innerHTML=html;
+  wrap.style.display="";
+  wrap.scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+
+function showDrillVehicleYear(row,year){
+  const{by}=extractYM([row]);
+  const d=by[year]||{parts:0,amort:0,bSum:0,gSum:0};
+  const wrap=$("drillWrap"),tbl=$("drillT");
+  $("drillTitle").textContent=vehName(row)+" — "+year;
+  let html='<thead><tr class="head-row"><th class="h-default">Категория</th><th class="h-total" style="text-align:right">Сумма</th></tr></thead><tbody>';
+  const rows=[["Запчасти и услуги",d.parts],["Амортизация",d.amort],["Бензин ₽",d.bSum],["Газ ₽",d.gSum],["ИТОГО",d.parts+d.amort+d.bSum+d.gSum]];
+  rows.forEach(([l,v])=>{html+="<tr><td>"+escHtml(l)+"</td><td style='text-align:right'>"+fn(v)+"</td></tr>"});
+  html+="</tbody>";
+  tbl.innerHTML=html;
+  wrap.style.display="";
+  wrap.scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+
+function chClickOpts(metric,title){
+  const o=chOpts();
+  o.onClick=(evt,elems,chart)=>{
+    if(!elems.length)return;
+    const year=chart.data.labels[elems[0].index];
+    if(year)showDrill(year,metric,title);
+  };
+  return o;
+}
+
+function updCharts(rows){
+  lastChartRows=rows;
+  const{years:rawY,by}=extractYM(rows);
+  const yr=getYearRange();
+  const years=yr.length?rawY.filter(y=>yr.includes(y)):rawY;
+  const p=years.map(y=>(by[y]||{}).parts||0),am=years.map(y=>(by[y]||{}).amort||0);
+  const bS=years.map(y=>(by[y]||{}).bSum||0),gS=years.map(y=>(by[y]||{}).gSum||0);
+  const bL=years.map(y=>(by[y]||{}).bL||0),gM=years.map(y=>(by[y]||{}).gM||0);
+  const tot=years.map((_,i)=>p[i]+am[i]+bS[i]+gS[i]);
+  const z=zuesCnt(rows);
+
+  mkCh("c1","c1","bar",{labels:years,datasets:[{label:"Запчасти и услуги",data:p,backgroundColor:"#ffb95e"}]},chClickOpts("parts","Запчасти и услуги"));
+  mkCh("c2","c2","bar",{labels:years,datasets:[{label:"Амортизация",data:am,backgroundColor:"#7fd39c"}]},chClickOpts("amort","Амортизация"));
+  const c3opts=chOpts();
+  c3opts.onClick=(evt,elems,chart)=>{
+    if(!elems.length)return;
+    const dsIdx=elems[0].datasetIndex;
+    const year=chart.data.labels[elems[0].index];
+    if(dsIdx===0)showDrill(year,"bSum","Бензин ₽");
+    else showDrill(year,"gSum","Газ ₽");
+  };
+  mkCh("c3","c3","line",{labels:years,datasets:[
+    {label:"Бензин ₽",data:bS,borderColor:"#7a68ff",backgroundColor:"rgba(122,104,255,.15)",tension:.2,pointRadius:4},
+    {label:"Газ ₽",data:gS,borderColor:"#26aa9a",backgroundColor:"rgba(38,170,154,.15)",tension:.2,pointRadius:4}
+  ]},c3opts);
+  const c4opts=chOpts();
+  c4opts.onClick=(evt,elems,chart)=>{
+    if(!elems.length)return;
+    const dsIdx=elems[0].datasetIndex;
+    const year=chart.data.labels[elems[0].index];
+    if(dsIdx===0)showDrill(year,"bL","Бензин (л)");
+    else showDrill(year,"gM","Газ (куб.м)");
+  };
+  mkCh("c4","c4","bar",{labels:years,datasets:[
+    {label:"Бензин (л)",data:bL,backgroundColor:"#ffd27a"},
+    {label:"Газ (куб.м)",data:gM,backgroundColor:"#f79ac0"}
+  ]},c4opts);
+  mkCh("c5","c5","bar",{labels:years,datasets:[{label:"Итого",data:tot,backgroundColor:"#e087ab"}]},chClickOpts("total","Итого расходов"));
+
+  const zuesI=H.findIndex(h=>(h||"").toLowerCase().includes("зуэс"));
+  const c6opts=chOpts();
+  c6opts.onClick=(evt,elems,ch)=>{
+    if(!elems.length||zuesI<0)return;
+    const lab=ch.data.labels[elems[0].index];
+    showDrillCategory(zuesI,lab,"ТС по ЗУЭС");
+  };
+  mkCh("c6","c6","bar",{labels:z.l,datasets:[{label:"Кол-во ТС",data:z.v,backgroundColor:"#84a9ee"}]},c6opts);
+
+  const br=brandCnt(rows);
+  const brandI=H.findIndex(h=>(h||"").toLowerCase().includes("марка"));
+  const c7opts=chOpts();
+  c7opts.onClick=(evt,elems,ch)=>{
+    if(!elems.length||brandI<0)return;
+    const lab=ch.data.labels[elems[0].index];
+    showDrillCategory(brandI,lab,"ТС по марке");
+  };
+  mkCh("c7","c7","bar",{labels:br.l,datasets:[{label:"Кол-во ТС",data:br.v,backgroundColor:"#6db3f2"}]},c7opts);
+
+  const wr=warrantyCnt(rows);
+  const p8={...pieOpts()};
+  p8.onClick=(evt,elems,ch)=>{
+    if(!elems.length)return;
+    showDrillWarranty(elems[0].index===0);
+  };
+  mkCh("c8","c8","doughnut",{
+    labels:["На гарантии (≥2025)","Без гарантии (<2025)"],
+    datasets:[{data:[wr.w,wr.nw],backgroundColor:["#4caf50","#ff7043"],borderWidth:2,borderColor:"#fff"}]
+  },p8);
+}
+
+let allAvailYears=[];
+let yrFrom=null,yrTo=null;
+
+function getYearRange(){
+  if(!allAvailYears.length)return[];
+  const f=yrFrom||allAvailYears[0], t=yrTo||allAvailYears[allAvailYears.length-1];
+  return allAvailYears.filter(y=>y>=f&&y<=t);
+}
+
+function populateYearSelects(){
+  allAvailYears=[];
+  H.forEach(h=>{const m=(h||"").toLowerCase().match(/(20\d{2})/);if(m&&!allAvailYears.includes(m[1]))allAvailYears.push(m[1])});
+  allAvailYears.sort();
+  const sf=$("yrFrom"),st=$("yrTo");
+  sf.innerHTML="";st.innerHTML="";
+  allAvailYears.forEach(y=>{
+    sf.innerHTML+='<option value="'+y+'">'+y+'</option>';
+    st.innerHTML+='<option value="'+y+'">'+y+'</option>';
+  });
+  sf.value=allAvailYears[0]||"";
+  st.value=allAvailYears[allAvailYears.length-1]||"";
+  yrFrom=null;yrTo=null;
+}
+
+$("bYrApply").addEventListener("click",()=>{
+  yrFrom=$("yrFrom").value;yrTo=$("yrTo").value;
+  requestAnimationFrame(()=>switchTab("charts"));
+});
+$("bYrReset").addEventListener("click",()=>{
+  yrFrom=null;yrTo=null;
+  $("yrFrom").value=allAvailYears[0]||"";
+  $("yrTo").value=allAvailYears[allAvailYears.length-1]||"";
+  requestAnimationFrame(()=>switchTab("charts"));
+});
+
+const SZ_MAP={s:300,m:420,l:580};
+let curSz="m";
+document.querySelectorAll(".ch-sz").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    curSz=btn.dataset.sz;
+    document.querySelectorAll(".ch-sz").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    document.querySelectorAll(".canvas-wrap").forEach(w=>{w.style.height=SZ_MAP[curSz]+"px"});
+    Object.values(ch).forEach(c=>c.resize());
+    pvChArr.forEach(c=>c.resize());
+  });
+});
+
+$("bUndo").addEventListener("click",undo);
+$("bClear").addEventListener("click",clearF);
+$("bSelAll").addEventListener("click",selectAllVehicles);
+$("bSelApply").addEventListener("click",applySel);
+$("bSelClear").addEventListener("click",clearSel);
+$("bTab").addEventListener("click",()=>switchTab("table"));
+$("bCharts").addEventListener("click",()=>switchTab("charts"));
+$("pvCardClose").addEventListener("click",()=>$("pvCard").classList.remove("active"));
+$("drillClose").addEventListener("click",()=>$("drillWrap").style.display="none");
+
+document.addEventListener("keydown",e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==="z"){e.preventDefault();undo()}
+});
+
+$("csvIn").addEventListener("change",async e=>{
+  const f=e.target.files&&e.target.files[0];if(!f)return;
+  try{
+    const rows=parseCsv(await f.text());
+    const d=normalize(rows[0],rows.slice(1));
+    go(d.headers,d.rows);
+    stat("CSV: "+d.rows.length+" строк","ok");
+  }catch(err){console.error(err);stat("Ошибка CSV","err")}
+  finally{$("csvIn").value=""}
+});
+
+function go(headers,rows){
+  H=headers;R=rows;
+  selected.clear();selApplied=false;hist=[];
+  $("bUndo").style.display="none";
+  updSelUI();
+  classify();
+  populateYearSelects();
+  buildSumBar();
+  buildT1();
+  buildT2();
+  requestAnimationFrame(applyF);
+}
+
+async function load(){
+  try{
+    stat("Загрузка...");
+    const url=`https://docs.google.com/spreadsheets/d/${SID}/gviz/tq?gid=${SGID}&tqx=out:json`;
+    const res=await fetch(url);if(!res.ok)throw new Error(res.status);
+    const j=parseGviz(await res.text());
+    const cols=j.table.cols.map(c=>c.label||c.id||"");
+    const rows=j.table.rows.map(r=>r.c.map(cv));
+    const d=normalize(cols,rows);
+    go(d.headers,d.rows);
+    stat("Загружено: "+d.rows.length+" строк","ok");
+  }catch(e){console.error(e);stat("Нет доступа. Загрузите CSV.","err")}
+}
+
+/* ===== Источники данных ===== */
+
+// Статичный JSON на GitHub Pages — быстрая загрузка при открытии страницы
+// ЗАМЕНИТЕ на ваш URL после настройки GitHub Pages (см. gas-export.gs)
+const DATA_JSON_URL="https://viscontiflint02-creator.github.io/tc-expenses/data.json";
+
+// Apps Script — вызывается кнопкой 🔄 для принудительного обновления из Google Sheets
+// Одновременно обновляет data.json на GitHub и возвращает свежие данные напрямую
+const APPS_SCRIPT_URL="https://script.google.com/macros/s/AKfycbxiYzJUc2f9nDfvGb3Cyt0FfE0tv7KG4Q3bp9BF9cXXckSQUZ3MuSzgAN1zMJ-m4Tx2/exec";
+
+/* Загрузка из статичного data.json (GitHub Pages) — используется при открытии
+   страницы и при автообновлении. Работает мгновенно. */
+async function loadFromJson(silent){
+  if(!silent)stat("Загрузка...");
+  try{
+    const res=await fetch(DATA_JSON_URL+"?_="+Date.now());
+    if(!res.ok)throw new Error(res.status);
+    const data=await res.json();
+    if(!data||!data.length)throw new Error("Пустые данные");
+    const d=normalize(data[0],data.slice(1));
+    go(d.headers,d.rows);
+    const ts=new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+    stat("Загружено: "+d.rows.length+" строк ("+ts+")","ok");
+  }catch(e){
+    console.error(e);
+    // Если data.json ещё не создан — попробовать Apps Script
+    if(!silent)loadFromAppsScript(false);
+    else stat("Ошибка загрузки. Нажмите 🔄","err");
+  }
+}
+
+/* Загрузка через Apps Script (JSONP) — кнопка 🔄.
+   Получает свежие данные из Google Sheets И обновляет data.json на GitHub. */
+let _jsonpN=0;
+function loadFromAppsScript(silent){
+  if(!silent)stat("Обновление из Google Sheets...");
+  const cbName="_gasCb"+(++_jsonpN);
+  const timeout=setTimeout(()=>{cleanup();if(!silent)stat("Таймаут. Загрузите CSV.","err")},30000);
+  function cleanup(){clearTimeout(timeout);delete window[cbName];if(sc&&sc.parentNode)sc.parentNode.removeChild(sc)}
+  window[cbName]=function(data){
+    cleanup();
+    try{
+      if(!data||!data.length)throw new Error("Пустые данные");
+      const d=normalize(data[0],data.slice(1));
+      go(d.headers,d.rows);
+      const ts=new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+      stat("Обновлено: "+d.rows.length+" строк ("+ts+")","ok");
+    }catch(e){console.error(e);if(!silent)stat("Ошибка обработки данных","err")}
+  };
+  const sc=document.createElement("script");
+  sc.src=APPS_SCRIPT_URL+"?callback="+cbName;
+  sc.onerror=function(){cleanup();if(!silent)stat("Ошибка загрузки. Загрузите CSV.","err")};
+  document.head.appendChild(sc);
+}
+
+/* Автообновление — лёгкий re-fetch data.json, не нагружает Google */
+let _autoTimer=null;
+function startAutoRefresh(min){
+  if(_autoTimer){clearInterval(_autoTimer);_autoTimer=null}
+  if(min>0)_autoTimer=setInterval(()=>loadFromJson(true),min*60*1000);
+}
+
+$("bRefresh").addEventListener("click",()=>loadFromAppsScript(false));
+$("autoSel").addEventListener("change",function(){startAutoRefresh(parseInt(this.value)||0)});
+
+/* Зум: используется нативный зум браузера (Ctrl+Scroll / Ctrl+/−).
+   Кастомный body.style.zoom удалён — он ломал систему координат Chart.js и клики по графикам. */
+
+/* Запуск: мгновенная загрузка из статичного data.json на GitHub Pages */
+loadFromJson(false);
+</script>
+</body>
+</html>
