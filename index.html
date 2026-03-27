@@ -225,6 +225,7 @@ function stat(m,t){statusEl.textContent=m;statusEl.className="status"+(t?" "+t:"
 function pn(v){if(v==null)return 0;const r=String(v).replace(/\s/g,"").replace(",",".").replace(/[^\d.-]/g,"");const n=+r;return isFinite(n)?n:0}
 function fn(n){if(!isFinite(n)||n===0)return"";return n.toLocaleString("ru-RU",{maximumFractionDigits:2})}
 function fe(v){if(!v)return"";return Math.round(v).toLocaleString("ru-RU")}
+function cellFmt(raw,isNum){if(!isNum)return raw??""===raw?"":String(raw??"");const s=String(raw??"").trim();if(!s||s==="-")return s;const n=pn(raw);if(!isFinite(n))return s;return n.toLocaleString("ru-RU",{maximumFractionDigits:2})}
 
 function saveState(){
   hist.push({fv:filters.map(f=>f.input.value),sel:new Set(selected),sa:selApplied});
@@ -499,7 +500,7 @@ function buildT1(){
   R.forEach((row,ri)=>{
     const tr=document.createElement("tr");
     t1C.forEach(ci=>{
-      const td=document.createElement("td");td.textContent=row[ci]||"";
+      const td=document.createElement("td");td.textContent=cellFmt(row[ci],numF[ci]);
       if(ci===nameColIdx)td.className="cname";
       bindCellSelFilter(td,ri,ci,row,true);
       tr.appendChild(td);
@@ -542,7 +543,7 @@ function buildT2(){
   R.forEach((row,ri)=>{
     const tr=document.createElement("tr");
     t2C.forEach(ci=>{
-      const td=document.createElement("td");td.textContent=row[ci]||"";
+      const td=document.createElement("td");td.textContent=cellFmt(row[ci],numF[ci]);
       if(ci===nameColIdx)td.className="cname";
       bindCellSelFilter(td,ri,ci,row,filters.some(f=>f.col===ci));
       tr.appendChild(td);
@@ -911,19 +912,36 @@ function chOpts(){
   };
 }
 
+function inferColYear(col){
+  const t=(H[col]||"").toLowerCase(),m=t.match(/(20\d{2})/);
+  if(m)return m[1];
+  for(let d=1;d<=6;d++){
+    for(const o of[d,-d]){
+      const adj=(H[col+o]||"").toLowerCase(),am=adj.match(/(20\d{2})/);
+      if(am)return am[1];
+    }
+  }
+  return null;
+}
+
 function extractYM(rows){
   const by={};
   const add=(y,k,v)=>{if(!by[y])by[y]={parts:0,amort:0,bSum:0,gSum:0,bL:0,gM:0};by[y][k]+=v};
   H.forEach((h,col)=>{
-    const t=(h||"").toLowerCase(),m=t.match(/(20\d{2})/);if(!m)return;
-    const y=m[1];
+    const t=(h||"").toLowerCase();
+    const hasFuel=t.includes("бензин")||t.includes("газ")||t.includes("запчаст")||t.includes("амортизац");
+    const m=t.match(/(20\d{2})/);
+    if(!m&&!hasFuel)return;
+    const y=m?m[1]:inferColYear(col);
+    if(!y)return;
     rows.forEach(r=>{
       const v=pn(r[col]);if(!v)return;
       if(t.includes("запчаст"))add(y,"parts",v);
       else if(t.includes("амортизац"))add(y,"amort",v);
-      else if(t.includes("бензин")&&t.includes("сум"))add(y,"bSum",v);
-      else if(t.includes("газ")&&t.includes("сум"))add(y,"gSum",v);
+      else if(t.includes("бензин")&&(t.includes("сум")||t.includes("стоим")))add(y,"bSum",v);
       else if(t.includes("бензин")&&(t.includes(" л")||t.includes("литр")))add(y,"bL",v);
+      else if(t.includes("бензин")&&!t.includes(" л")&&!t.includes("литр"))add(y,"bSum",v);
+      else if(t.includes("газ")&&(t.includes("сум")||t.includes("стоим")))add(y,"gSum",v);
       else if(t.includes("газ")&&(t.includes("куб")||t.includes("м3")))add(y,"gM",v);
     });
   });
