@@ -648,12 +648,15 @@ function rowMetrics(row){
   let parts=0,amort=0,bSum=0,gSum=0;
   H.forEach((h,col)=>{
     const t=(h||"").toLowerCase();
+    if(t.includes("итого")||t.includes("всего"))return;
     if(!/(20\d{2})/.test(t))return;
     const v=pn(row[col]);if(!v)return;
     if(t.includes("запчаст"))parts+=v;
     else if(t.includes("амортизац"))amort+=v;
     else if(t.includes("бензин")&&t.includes("сум"))bSum+=v;
     else if(t.includes("газ")&&t.includes("сум"))gSum+=v;
+    else if(t.includes("бензин")&&!t.includes(" л")&&!t.includes("литр"))bSum+=v;
+    else if(t.includes("газ")&&!t.includes("куб")&&!t.includes("м3"))gSum+=v;
   });
   return{parts,amort,bSum,gSum,total:parts+amort+bSum+gSum};
 }
