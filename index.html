@@ -1264,8 +1264,10 @@ async function loadFromJson(silent){
   try{
     const res=await fetch(DATA_JSON_URL+"?_="+Date.now());
     if(!res.ok)throw new Error(res.status);
-    const data=await res.json();
-    if(!data||!data.length)throw new Error("Пустые данные");
+    const raw=await res.json();
+    if(!raw||!raw.length)throw new Error("Пустые данные");
+    // Конвертируем все значения в строки (getValues() возвращает числа, даты и т.д.)
+    const data=raw.map(row=>row.map(cell=>cell===null||cell===undefined?"":String(cell)));
     const d=normalize(data[0],data.slice(1));
     go(d.headers,d.rows);
     const ts=new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
