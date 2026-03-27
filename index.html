@@ -1312,7 +1312,7 @@ function startAutoRefresh(min){
   if(min>0)_autoTimer=setInterval(()=>loadFromJson(true),min*60*1000);
 }
 
-$("bRefresh").addEventListener("click",()=>loadFromAppsScript(false));
+$("bRefresh").addEventListener("click",()=>loadFromJson(false));
 $("autoSel").addEventListener("change",function(){startAutoRefresh(parseInt(this.value)||0)});
 
 /* Зум: используется нативный зум браузера (Ctrl+Scroll / Ctrl+/−).
