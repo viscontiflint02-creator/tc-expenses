@@ -1292,7 +1292,8 @@ function loadFromAppsScript(silent){
     cleanup();
     try{
       if(!data||!data.length)throw new Error("Пустые данные");
-      const d=normalize(data[0],data.slice(1));
+      const strData=data.map(row=>row.map(cell=>cell===null||cell===undefined?"":String(cell)));
+      const d=normalize(strData[0],strData.slice(1));
       go(d.headers,d.rows);
       const ts=new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
       stat("Обновлено: "+d.rows.length+" строк ("+ts+")","ok");
