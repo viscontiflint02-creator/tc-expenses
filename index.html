@@ -912,37 +912,38 @@ function chOpts(){
   };
 }
 
-function inferColYear(col){
-  const t=(H[col]||"").toLowerCase(),m=t.match(/(20\d{2})/);
-  if(m)return m[1];
-  for(let d=1;d<=6;d++){
-    for(const o of[d,-d]){
-      const adj=(H[col+o]||"").toLowerCase(),am=adj.match(/(20\d{2})/);
-      if(am)return am[1];
-    }
-  }
-  return null;
-}
-
 function extractYM(rows){
   const by={};
   const add=(y,k,v)=>{if(!by[y])by[y]={parts:0,amort:0,bSum:0,gSum:0,bL:0,gM:0};by[y][k]+=v};
+  function nearYear(col){
+    for(let d=1;d<=3;d++){
+      for(const o of[d,-d]){
+        const a=(H[col+o]||"").toLowerCase(),am=a.match(/(20\d{2})/);
+        if(am)return am[1];
+      }
+    }
+    return null;
+  }
   H.forEach((h,col)=>{
     const t=(h||"").toLowerCase();
-    const hasFuel=t.includes("бензин")||t.includes("газ")||t.includes("запчаст")||t.includes("амортизац");
+    if(t.includes("итого")||t.includes("всего"))return;
     const m=t.match(/(20\d{2})/);
-    if(!m&&!hasFuel)return;
-    const y=m?m[1]:inferColYear(col);
-    if(!y)return;
+    let y=m?m[1]:null;
+    if(!y){
+      const isFuelNoYear=(t.includes("газ")&&(t.includes("куб")||t.includes("м3")))||
+                         (t.includes("бензин")&&(t.includes(" л")||t.includes("литр")));
+      if(!isFuelNoYear)return;
+      y=nearYear(col);if(!y)return;
+    }
     rows.forEach(r=>{
       const v=pn(r[col]);if(!v)return;
       if(t.includes("запчаст"))add(y,"parts",v);
       else if(t.includes("амортизац"))add(y,"amort",v);
-      else if(t.includes("бензин")&&(t.includes("сум")||t.includes("стоим")))add(y,"bSum",v);
+      else if(t.includes("бензин")&&t.includes("сум"))add(y,"bSum",v);
+      else if(t.includes("газ")&&t.includes("сум"))add(y,"gSum",v);
       else if(t.includes("бензин")&&(t.includes(" л")||t.includes("литр")))add(y,"bL",v);
-      else if(t.includes("бензин")&&!t.includes(" л")&&!t.includes("литр"))add(y,"bSum",v);
-      else if(t.includes("газ")&&(t.includes("сум")||t.includes("стоим")))add(y,"gSum",v);
       else if(t.includes("газ")&&(t.includes("куб")||t.includes("м3")))add(y,"gM",v);
+      else if(t.includes("бензин"))add(y,"bSum",v);
     });
   });
   return{years:Object.keys(by).sort(),by};
