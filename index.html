@@ -225,7 +225,7 @@ function stat(m,t){statusEl.textContent=m;statusEl.className="status"+(t?" "+t:"
 function pn(v){if(v==null)return 0;const r=String(v).replace(/\s/g,"").replace(",",".").replace(/[^\d.-]/g,"");const n=+r;return isFinite(n)?n:0}
 function fn(n){if(!isFinite(n)||n===0)return"";return n.toLocaleString("ru-RU",{maximumFractionDigits:2})}
 function fe(v){if(!v)return"";return Math.round(v).toLocaleString("ru-RU")}
-function cellFmt(raw,isNum){if(!isNum)return raw??""===raw?"":String(raw??"");const s=String(raw??"").trim();if(!s||s==="-")return s;const n=pn(raw);if(!isFinite(n))return s;return n.toLocaleString("ru-RU",{maximumFractionDigits:2})}
+function cellFmt(raw,isNum){if(!isNum)return raw==null?"":String(raw);const s=String(raw??"").trim();if(!s||s==="-")return s;const n=pn(raw);if(!isFinite(n))return s;return n.toLocaleString("ru-RU",{maximumFractionDigits:2})}
 
 function saveState(){
   hist.push({fv:filters.map(f=>f.input.value),sel:new Set(selected),sa:selApplied});
